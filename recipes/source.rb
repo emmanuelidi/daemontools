@@ -19,22 +19,28 @@
 
 include_recipe "build-essential"
 
-remote_file "/tmp/daemontools.tar.gz" do
+remote_file "#{Chef::Config[:file_cache_path]}/daemontools.tar.gz" do
   source node['daemontools']['source_url']
   checksum node['daemontools']['source_checksum']
   owner "root"
-  not_if {::File.exists?("#{node['daemontools']['bin_dir']}/svscan")}
+  notifies :run, "bash[install_daemontools]", :immediately
 end
 
 bash "install_daemontools" do
   user "root"
-  cwd "/tmp"
+  cwd Chef::Config[:file_cache_path]
   code <<-EOH
     (cd /tmp; mkdir daemontools)
-    (cd /tmp; tar zxvf daemontools.tar.gz -C daemontools --strip-components 2)
+    (tar zxvf daemontools.tar.gz -C /tmp/daemontools --strip-components 2)
     (cd /tmp/daemontools; perl -pi -e 's/extern int errno;/\#include <errno.h>/' src/error.h)
     (cd /tmp/daemontools; package/compile)
     (cd /tmp/daemontools; mv command/* #{node['daemontools']['bin_dir']})
     EOH
-  not_if {::File.exists?("#{node['daemontools']['bin_dir']}/svscan")}
+  action :nothing
+  notifies :delete, "directory[/tmp/daemontools]", :immediately
+end
+
+directory "/tmp/daemontools" do
+  recursive true
+  action :nothing
 end
